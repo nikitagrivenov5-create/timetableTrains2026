@@ -1,20 +1,13 @@
-const router = require("express").Router();
-const pool = require("../db");
+const express = require("express");
+const router = express.Router();
 
-router.get("/", async (req, res) => {
-  const routes = await pool.query("SELECT * FROM routes");
-  res.json(routes.rows);
+router.get("/", (req, res) => {
+  res.send("Routes working");
 });
 
-router.post("/", async (req, res) => {
-  const { departure_station, arrival_station, stops } = req.body;
-
-  const newRoute = await pool.query(
-    "INSERT INTO routes (departure_station, arrival_station, stops) VALUES ($1,$2,$3) RETURNING *",
-    [departure_station, arrival_station, stops]
-  );
-
-  res.json(newRoute.rows[0]);
+router.post("/", (req, res) => {
+  console.log("POST /routes hit");
+  res.json({ message: "Route added" });
 });
 
 module.exports = router;

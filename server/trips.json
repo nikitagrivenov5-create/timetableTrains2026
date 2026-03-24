@@ -1,0 +1,16 @@
+[
+  {
+    "id": 1,
+    "route_id": 1,
+    "train_id": 2,
+    "departure_time": "10:00",
+    "arrival_time": "10:30"
+  },
+  {
+    "id": 2,
+    "route_id": 2,
+    "train_id": 3,
+    "departure_time": "18:00",
+    "arrival_time": "18:20"
+  }
+]

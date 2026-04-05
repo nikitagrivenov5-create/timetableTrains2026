@@ -1,41 +1,70 @@
 import React, { useState } from "react";
+import { notify } from "../modules/notifications"; // <-- подключаем твою функцию уведомлений
 
-function StationForm({ onNewStation }) {
+export default function StationForm({ onNewStation }) {
   const [name, setName] = useState("");
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async e => {
     e.preventDefault();
-    if (!name.trim()) return alert("Введите название станции");
+    if (!name.trim()) {
+      notify("Введите название станции");
+      return;
+    }
 
     try {
       const res = await fetch("http://localhost:5050/stations", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: name.trim() }),
+        body: JSON.stringify({ name: name.trim() })
       });
       const data = await res.json();
       if (!res.ok) {
-        alert(data.error || "Ошибка сервера");
+        notify(data.error || "Ошибка сервера");
         return;
       }
       onNewStation(data);
       setName("");
-    } catch (err) {
-      alert("Ошибка соединения");
+
+    } catch {
+      notify("Ошибка соединения");
     }
   };
 
   return (
-    <form onSubmit={handleSubmit}>
+    <form
+      onSubmit={handleSubmit}
+      style={{
+        display: "flex",
+        gap: "10px",
+        alignItems: "center",
+        marginBottom: "10px"
+      }}
+    >
       <input
-        type="text"      // текст, не number
-        value={name}
-        onChange={(e) => setName(e.target.value)}
         placeholder="Название станции"
+        value={name}
+        onChange={e => setName(e.target.value)}
+        style={{
+          padding: "8px 12px",
+          borderRadius: "8px",
+          border: "1px solid #ccc",
+          flex: 1
+        }}
       />
-      <button type="submit">Добавить станцию</button>
+      <button
+        type="submit"
+        style={{
+          padding: "6px 12px",
+          borderRadius: "10px",
+          border: "none",
+          backgroundColor: "#4ade80",
+          color: "white",
+          fontWeight: "bold",
+          cursor: "pointer"
+        }}
+      >
+        Добавить
+      </button>
     </form>
   );
 }
-
-export default StationForm;

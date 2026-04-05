@@ -1,96 +1,102 @@
 import React, { useState } from "react";
+import { validateRoute } from "../modules/routes";
+import { notify } from "../modules/notifications";
 
-function RouteForm({ stations, onNewRoute }) {
+export default function RouteForm({ stations = [], onNewRoute }) {
   const [departure, setDeparture] = useState("");
   const [arrival, setArrival] = useState("");
   const [stops, setStops] = useState([]);
 
-  const handleSubmit = async (e) => {
+  const selectStyle = {
+    padding: "8px 12px",
+    borderRadius: "8px",
+    border: "1px solid #ccc",
+    flex: 1
+  };
+
+  const buttonStyle = {
+    padding: "6px 12px",
+    borderRadius: "10px",
+    border: "none",
+    backgroundColor: "#4ade80",
+    color: "white",
+    fontWeight: "bold",
+    cursor: "pointer"
+  };
+
+  const handleSubmit = async e => {
     e.preventDefault();
 
-    if (!departure || !arrival) {
-      alert("Выберите станции отправления и прибытия");
+    const routeData = { departure, arrival, stops };
+
+    const check = validateRoute(routeData);
+
+    if (check.error) {
+      notify(check.error);
       return;
     }
-
-    if (departure === arrival) {
-      alert("Станция отправления и прибытия не могут совпадать");
-      return;
-    }
-
-    const newRoute = {
-      departure,
-      arrival,
-      stops,
-    };
 
     try {
       const res = await fetch("http://localhost:5050/routes", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(newRoute),
+        body: JSON.stringify(routeData)
       });
 
       const data = await res.json();
 
       if (!res.ok) {
-        const msg = data.error || JSON.stringify(data) || `Ошибка ${res.status}`;
-        alert(msg);
+        notify(data.error || "Ошибка сервера");
         return;
       }
 
-      onNewRoute(data); // добавляем в App.jsx
+      onNewRoute(data);
+
       setDeparture("");
       setArrival("");
       setStops([]);
-      alert("Маршрут добавлен ✅");
-    } catch (err) {
-      console.error(err);
-      alert("Ошибка соединения с сервером");
+
+    } catch {
+      notify("Ошибка соединения");
     }
   };
 
-  const handleStopsChange = (e) => {
-    const selected = Array.from(e.target.selectedOptions, option => option.value);
-    setStops(selected);
-  };
-
   return (
-    <div style={{ marginBottom: "15px" }}>
-      <h2>Добавить маршрут</h2>
-      <form onSubmit={handleSubmit}>
-        <div>
-          <label>Станция отправления: </label>
-          <select value={departure} onChange={e => setDeparture(e.target.value)}>
-            <option value="">Выберите станцию</option>
-            {stations.map(s => <option key={s.id} value={s.name}>{s.name}</option>)}
-          </select>
-        </div>
+    <>
+      <form onSubmit={handleSubmit} style={{ display: "flex", gap: "10px", marginBottom: "10px" }}>
+        <select value={departure} onChange={e => setDeparture(e.target.value)} style={selectStyle}>
+          <option value="">Откуда</option>
+          {stations.map(s => (
+            <option key={s.id} value={s.name}>{s.name}</option>
+          ))}
+        </select>
 
-        <div>
-          <label>Станция прибытия: </label>
-          <select value={arrival} onChange={e => setArrival(e.target.value)}>
-            <option value="">Выберите станцию</option>
-            {stations.map(s => <option key={s.id} value={s.name}>{s.name}</option>)}
-          </select>
-        </div>
+        <select value={arrival} onChange={e => setArrival(e.target.value)} style={selectStyle}>
+          <option value="">Куда</option>
+          {stations.map(s => (
+            <option key={s.id} value={s.name}>{s.name}</option>
+          ))}
+        </select>
 
-        <div>
-          <label>Остановочные пункты (Ctrl+Click для множественного выбора): </label>
-          <select multiple value={stops} onChange={handleStopsChange}>
-            {stations
-              .filter(s => s.name !== departure && s.name !== arrival)
-              .map(s => (
-                <option key={s.id} value={s.name}>{s.name}</option>
-              ))
-            }
-          </select>
-        </div>
-
-        <button type="submit" style={{ marginTop: "10px" }}>Добавить маршрут</button>
+        <button type="submit" style={buttonStyle}>
+          Добавить маршрут
+        </button>
       </form>
-    </div>
+
+      <div style={{ display: "flex", gap: "10px", marginBottom: "10px" }}>
+        <select
+          multiple
+          value={stops}
+          onChange={e =>
+            setStops(Array.from(e.target.selectedOptions, option => option.value))
+          }
+          style={{ ...selectStyle, flex: 1, height: "80px" }}
+        >
+          {stations.map(s => (
+            <option key={s.id} value={s.name}>{s.name}</option>
+          ))}
+        </select>
+      </div>
+    </>
   );
 }
-
-export default RouteForm;

@@ -1,7 +1,10 @@
 const express = require("express");
 const cors = require("cors");
 const fs = require("fs"); //сохранение данных
+const { Worker } = require("worker_threads");
 const path = require("path");
+
+const allowedModes = ["include", "exclude", "all", "none"];
 
 const app = express();
 app.use(cors({ origin: "http://localhost:3000" }));
@@ -33,11 +36,39 @@ let trips = readJSON(tripsFile);
 let users = readJSON(usersFile);
 let codes = {}; // хранится в памяти, при перезапуске исчезает
 
+let schedulerWorker = null;
+
+function startScheduler(trips) {
+  if (schedulerWorker) {
+    schedulerWorker.terminate();
+  }
+
+  schedulerWorker = new Worker(
+    path.resolve(__dirname, "schedulerWorker.js")
+  );
+
+  schedulerWorker.postMessage({
+    type: "start",
+    trips
+  });
+
+  schedulerWorker.on("message", (msg) => {
+    console.log("📢 Worker:", msg.message);
+  });
+
+  schedulerWorker.on("error", (err) => {
+    console.error("Worker error:", err);
+  });
+}
+
 // Get
 app.get("/stations", (req, res) => res.json(stations));
 app.get("/trains", (req, res) => res.json(trains));
 app.get("/routes", (req, res) => res.json(routes));
-app.get("/trips", (req, res) => res.json(trips));
+app.get("/trips", (req, res) => {
+  res.json(trips);
+  startScheduler(trips); 
+});
 
 // Post
 app.post("/stations", (req, res) => {
@@ -61,14 +92,16 @@ app.post("/trains", (req, res) => {
 });
 
 app.post("/routes", (req, res) => {
-  const { departure, arrival, stops } = req.body;
+  const { departure, arrival, stops, stopsMode } = req.body;
   if (!departure || !arrival)
     return res.status(400).json({ error: "Заполните поля" });
+  
   const newRoute = {
     id: routes.length + 1,
     departure,
     arrival,
     stops: stops || [],
+    stopsMode: allowedModes.includes(stopsMode) ? stopsMode : "include"
   };
   routes.push(newRoute);
   writeJSON(routesFile, routes);
@@ -90,61 +123,68 @@ app.post("/trips", (req, res) => {
   trips.push(newTrip);
   writeJSON(tripsFile, trips);
   res.status(201).json(newTrip);
+  startScheduler(trips);
 });
 
 // Регистрация
 app.post("/register", (req, res) => {
-  const { email, password } = req.body;
-  if (!email || !password) {
+  const { username, password } = req.body;
+  if (!username || !password) {
     return res.status(400).json({ error: "Заполните все поля" });
   }
-  const exists = users.find(u => u.email === email);
+  const exists = users.find(u => u.username === username);
   if (exists) {
     return res.status(400).json({ error: "Пользователь уже существует" });
   }
-  const newUser = { email, password };
+  const newUser = {
+    username,
+    password,
+    role: "user"
+  };
   users.push(newUser);
   writeJSON(usersFile, users);
-  console.log("Регистрация:", email);
+  console.log("Регистрация:", username);
   res.json({ success: true });
 });
 
 // Логин (2FA)
 app.post("/login", (req, res) => {
-  const { email, password } = req.body;
-  const user = users.find(u => u.email === email && u.password === password);
+  const { username, password } = req.body;
+  const user = users.find(u => u.username === username && u.password === password);
   if (!user) {
     return res.status(400).json({ error: "Неверные данные" });
   }
   const now = Date.now();
   // защита от спама
-  if (codes[email] && now - codes[email].time < 30000) {
+  if (codes[username] && now - codes[username].time < 30000) {
     return res.status(400).json({
       error: "Подождите 30 секунд перед повторной отправкой",
     });
   }
   const code = Math.floor(100000 + Math.random() * 900000).toString();
-  codes[email] = {
+  codes[username] = {
     code,
     time: now,
   };
-  console.log(`2FA код для ${email}:`, code);
+  console.log(`2FA код для ${username}:`, code);
   res.json({ message: "Код отправлен" });
 });
 
 // Проверка
 app.post("/verify", (req, res) => {
-  const { email, code } = req.body;
-  if (!codes[email]) {
+  const { username, code } = req.body;
+  const user = users.find(u => u.username === username);
+  if (!codes[username]) {
     return res.status(400).json({ error: "Код не запрошен" });
   }
-  if (codes[email].code !== code) {
+  if (codes[username].code !== code) {
     return res.status(400).json({ error: "Неверный код" });
   }
-  delete codes[email];
+  delete codes[username];
   res.json({
     success: true,
     token: "fake-token", // имитация авторизации
+    role: user.role || "user"
   });
 });
 
@@ -199,11 +239,12 @@ app.put("/trips/:id", (req, res) => {
   trip.arrival_time = arrival_time;
   writeJSON(tripsFile, trips);
   res.json(trip);
+  startScheduler(trips);
 });
 
 app.put("/routes/:id", (req, res) => {
   const id = parseInt(req.params.id);
-  const { departure, arrival, stops } = req.body;
+  const { departure, arrival, stops, stopsMode } = req.body;
   const route = routes.find(r => r.id === id);
   if (!route) {
     return res.status(404).json({ error: "Маршрут не найден" });
@@ -214,6 +255,9 @@ app.put("/routes/:id", (req, res) => {
   route.departure = departure;
   route.arrival = arrival;
   route.stops = stops || [];
+  route.stopsMode = allowedModes.includes(stopsMode)
+    ? stopsMode
+    : "include";
   writeJSON(routesFile, routes);
   res.json(route);
 });

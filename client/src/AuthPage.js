@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { notify } from "./modules/notifications"; 
 
 function AuthPage({ onLogin }) {
-  const [email, setEmail] = useState("");
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [code, setCode] = useState("");
   const [step, setStep] = useState(1);
@@ -12,14 +12,14 @@ function AuthPage({ onLogin }) {
 
   // Функция логина (2FA)
   const login = async () => {
-    if (!email || !password) return;
+    if (!username || !password) return;
     setLoading(true);
 
     try {
       const res = await fetch("http://localhost:5050/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ username, password }),
       });
       const data = await res.json();
       if (res.ok) {
@@ -60,11 +60,11 @@ function AuthPage({ onLogin }) {
       const res = await fetch("http://localhost:5050/verify", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, code }),
+        body: JSON.stringify({ username, code }),
       });
       const data = await res.json();
       if (data.success) {
-        onLogin();
+        onLogin(data.role);
         notify("Успешный вход");
       } else {
         notify(data.error || "Неверный код");
@@ -79,13 +79,13 @@ function AuthPage({ onLogin }) {
 
   // Регистрация
   const register = async () => {
-    if (!email || !password) return;
+    if (!username || !password) return;
     setLoading(true);
     try {
       const res = await fetch("http://localhost:5050/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ username, password }),
       });
       const data = await res.json();
       if (res.ok) {
@@ -148,9 +148,12 @@ function AuthPage({ onLogin }) {
         {/* Шаг 1: логин / регистрация */}
         <div style={stepStyle(step === 1)}>
           <input
-            placeholder="Email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
+            placeholder="Логин"
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") login();
+            }}
             style={inputStyle}
           />
           <input
@@ -158,13 +161,16 @@ function AuthPage({ onLogin }) {
             placeholder="Пароль"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") login();
+            }}
             style={inputStyle}
           />
           {isRegister ? (
             <button
               onClick={register}
               style={buttonStyle}
-              disabled={loading || !email || !password}
+              disabled={loading || !username || !password}
             >
               {loading ? "Загрузка..." : "Зарегистрироваться"}
             </button>
@@ -172,7 +178,7 @@ function AuthPage({ onLogin }) {
             <button
               onClick={login}
               style={buttonStyle}
-              disabled={loading || !email || !password || cooldown > 0}
+              disabled={loading || !username || !password || cooldown > 0}
             >
               {loading ? "Загрузка..." : cooldown > 0 ? `Повторно через ${cooldown}s` : "Войти"}
             </button>
@@ -188,9 +194,12 @@ function AuthPage({ onLogin }) {
         {/* Шаг 2: код */}
         <div style={stepStyle(step === 2)}>
           <input
-            placeholder="Код из email"
+            placeholder="Код"
             value={code}
             onChange={(e) => setCode(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") verify();
+            }}
             style={inputStyle}
           />
           <button

@@ -4,9 +4,9 @@ export function notify(message) {
   const div = document.createElement("div");
   div.innerText = message;
 
-  const height = 70; // запас под высоту + отступ
+  const height = 70; 
 
-  // двигаем старые вверх
+  // двигаем вверх
   notifications.forEach((el) => {
     const currentBottom = parseInt(el.style.bottom);
     el.style.bottom = `${currentBottom + height}px`;
@@ -24,7 +24,7 @@ export function notify(message) {
   div.style.zIndex = "999";
   div.style.fontWeight = "bold";
 
-  // анимация (начальное состояние)
+  // анимация 
   div.style.opacity = "0";
   div.style.transform = "translateY(20px)";
   div.style.transition = "all 0.3s ease";

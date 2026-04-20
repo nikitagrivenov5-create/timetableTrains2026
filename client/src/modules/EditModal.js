@@ -111,7 +111,7 @@ export default function EditModal({ isOpen, onClose, title, fields, onSave }) {
             const type = typeof field === "object" ? field.type || "text" : "text";
             const options = typeof field === "object" ? field.options || [] : [];
 
-            // MULTISELECT
+            // Мультивыбор
             if (type === "multiselect") {
               return (
                 <div key={k} style={{ display: "flex", flexDirection: "column" }}>
@@ -151,7 +151,7 @@ export default function EditModal({ isOpen, onClose, title, fields, onSave }) {
               );
             }
 
-            // SELECT
+            // Выбрать
             if (type === "select") {
               return (
                 <div key={k} style={{ display: "flex", flexDirection: "column" }}>
@@ -184,7 +184,7 @@ export default function EditModal({ isOpen, onClose, title, fields, onSave }) {
               );
             }
 
-            // INPUT / TIME
+            // Input / время
             return (
               <div key={k} style={{ display: "flex", flexDirection: "column" }}>
                 <label style={{ marginBottom: "4px", fontWeight: "bold", display: "block" }}>

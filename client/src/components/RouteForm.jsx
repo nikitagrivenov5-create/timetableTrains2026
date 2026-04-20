@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect} from "react";
 import { validateRoute } from "../modules/routes";
 import { notify } from "../modules/notifications";
 
@@ -6,6 +6,13 @@ export default function RouteForm({ stations = [], onNewRoute }) {
   const [departure, setDeparture] = useState("");
   const [arrival, setArrival] = useState("");
   const [stops, setStops] = useState([]);
+  const [stopsMode, setStopsMode] = useState("include");
+
+  useEffect(() => {
+    if (stopsMode === "all" || stopsMode === "none") {
+      setStops([]);
+    }
+  }, [stopsMode]);
 
   const selectStyle = {
     padding: "8px 12px",
@@ -27,7 +34,7 @@ export default function RouteForm({ stations = [], onNewRoute }) {
   const handleSubmit = async e => {
     e.preventDefault();
 
-    const routeData = { departure, arrival, stops };
+    const routeData = { departure, arrival, stops, stopsMode };
 
     const check = validateRoute(routeData);
 
@@ -49,12 +56,11 @@ export default function RouteForm({ stations = [], onNewRoute }) {
         notify(data.error || "Ошибка сервера");
         return;
       }
-
       onNewRoute(data);
-
       setDeparture("");
       setArrival("");
       setStops([]);
+      setStopsMode("include");
 
     } catch {
       notify("Ошибка соединения");
@@ -95,6 +101,16 @@ export default function RouteForm({ stations = [], onNewRoute }) {
           {stations.map(s => (
             <option key={s.id} value={s.name}>{s.name}</option>
           ))}
+        </select>
+        <select
+          value={stopsMode}
+          onChange={e => setStopsMode(e.target.value)}
+          style={selectStyle}
+        >
+          <option value="include">Только выбранные</option>
+          <option value="exclude">Кроме выбранных</option>
+          <option value="all">Везде</option>
+          <option value="none">Без остановок</option>
         </select>
       </div>
     </>

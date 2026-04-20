@@ -201,5 +201,12 @@
     "train_id": 6,
     "departure_time": "20:21",
     "arrival_time": "20:48"
+  },
+  {
+    "id": 30,
+    "route_id": 1,
+    "train_id": 1,
+    "departure_time": "13:54",
+    "arrival_time": "14:30"
   }
 ]

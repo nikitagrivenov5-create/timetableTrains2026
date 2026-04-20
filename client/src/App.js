@@ -10,16 +10,21 @@ import { notify } from "./modules/notifications";
 
 function App() {
   const [isAuth, setIsAuth] = useState(() => localStorage.getItem("isAuth") === "true");
+  const [role, setRole] = useState("user");
   const [stations, setStations] = useState([]);
   const [trains, setTrains] = useState([]);
   const [routes, setRoutes] = useState([]);
+  const [search, setSearch] = useState("");
   const [trips, setTrips] = useState([]);
   const [showLogout, setShowLogout] = useState(false);
+  const [searchInput, setSearchInput] = useState("");
 
-  // Автовыход при старте
   useEffect(() => {
-    localStorage.removeItem("isAuth");
-    setIsAuth(false);
+    const savedAuth = localStorage.getItem("isAuth") === "true";
+    const savedRole = localStorage.getItem("role");
+    setIsAuth(savedAuth);
+    setRole(savedRole);
+    if (savedAuth) fetchAll();
   }, []);
 
   // Модалка редактирования
@@ -144,13 +149,24 @@ function App() {
           value: route.stops || [],
           options: stations.map(s => ({ value: s.name, label: s.name })),
           required: false
-        }
+        },
+        "Режим остановок": {
+          type: "select",
+          value: route.stopsMode || "include",
+          options: [
+            { value: "include", label: "Только выбранные" },
+            { value: "exclude", label: "Кроме выбранных" },
+            { value: "all", label: "Везде" },
+            { value: "none", label: "Без остановок" }
+          ]
+        },
       },
       async values => {
         const body = {
           departure: values["Откуда"],
           arrival: values["Куда"],
-          stops: values["Остановки"]
+          stops: values["Остановки"], 
+          stopsMode: values["Режим остановок"]
         };
         try {
           console.log("Editing route id:", route.id);
@@ -243,30 +259,96 @@ function App() {
   };
 
   // Авторизация
-  const handleLogin = () => { setIsAuth(true); localStorage.setItem("isAuth", "true"); fetchAll(); };
-  const handleLogout = () => { setIsAuth(false); localStorage.removeItem("isAuth"); };
+  const handleLogin = (userRole) => {
+    setIsAuth(true);
+    setRole(userRole);
+    localStorage.setItem("isAuth", "true");
+    localStorage.setItem("role", userRole);
+    fetchAll();
+  };
+  
+  const handleLogout = () => {
+    setIsAuth(false);
+    setRole(null);
+    setShowLogout(false);
+    localStorage.removeItem("isAuth");
+    localStorage.removeItem("role");
+  };
   if (!isAuth) return <AuthPage onLogin={handleLogin} />;
   const cardStyle = { backgroundColor: "white", padding: "20px", borderRadius: "20px", boxShadow: "0 0 20px rgba(0,0,0,0.2)", marginBottom: "20px" };
-  const tableStyle = { width: "100%", borderCollapse: "collapse", borderRadius: "10px", overflow: "hidden", marginTop: "10px" };
+  const tableStyle = { width: "100%", borderCollapse: "collapse", borderRadius: "10px", overflow: "hidden", marginTop: "10px", tableLayout: "fixed" };
   const thStyle = { backgroundColor: "#22d3ee", color: "white", padding: "8px", textAlign: "left" };
   const tdStyle = { padding: "8px", borderBottom: "1px solid #ddd" };
   const buttonStyle = { padding: "6px 12px", borderRadius: "10px", border: "none", backgroundColor: "#22d3ee", color: "white", cursor: "pointer", fontWeight: "bold", transition: "0.3s", marginRight: "5px" };
 
+  const getDuration = (start, end) => {
+    if (!start || !end) return "—";
+
+    const [sh, sm] = start.split(":").map(Number);
+    const [eh, em] = end.split(":").map(Number);
+
+    let startMin = sh * 60 + sm;
+    let endMin = eh * 60 + em;
+
+    if (endMin < startMin) endMin += 24 * 60;
+
+    const diff = endMin - startMin;
+
+    const h = Math.floor(diff / 60);
+    const m = diff % 60;
+
+    if (h === 0) return `${m}м`;
+    if (m === 0) return `${h}ч`;
+
+    return `${h}ч ${m.toString().padStart(2, "0")}м`;
+  };
+
   return (
     <div style={{ minHeight: "100vh", padding: "20px", background: "linear-gradient(to bottom right, #4ade80, #3b82f6)" }}>
       <div style={{ maxWidth: "1200px", margin: "0 auto" }}>
-        <div style={{ position: "relative", marginBottom: "20px" }}>
-          <div style={{ display: "flex", alignItems: "center" }}>
+        <div
+          style={{
+            position: "sticky",
+            top: 10,
+            zIndex: 100,
+            marginBottom: "20px",
+            //цвет под роль
+            backgroundColor: role === "admin"
+              ? "rgba(59, 130, 246, 0.45)"   //админ
+              : "rgba(74, 222, 128, 0.45)", //пользователь
+            backdropFilter: "blur(12px) saturate(180%)",  //стекло
+            WebkitBackdropFilter: "blur(12px) saturate(180%)", // для Safari
+            padding: "10px 15px",
+            boxShadow: "0 4px 20px rgba(0,0,0,0.2)",
+            overflow: "hidden",
+            borderRadius: "20px",
+            borderBottom: "1px solid rgba(255,255,255,0.2)" // лёгкая граница как стекло
+
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", position: "relative" }}>
             <img src="/logo.png" alt="Лого" style={{ height: "60px", borderRadius: "12px", objectFit: "cover", marginRight: "20px", cursor: "pointer" }} onClick={() => setShowLogout(prev => !prev)} />
             <h1 style={{ color: "white", fontSize: "2rem" }}>Расписание электричек</h1>
           </div>
           {showLogout && (
-            <button onClick={handleLogout} style={{ position: "absolute", top: "75px", left: "0", padding: "6px 12px", borderRadius: "10px", border: "none", backgroundColor: "#ff0000", color: "white", fontWeight: "bold", cursor: "pointer" }}>
+            <button
+              onClick={handleLogout}
+              style={{
+                padding: "3px 10px",   
+                borderRadius: "8px",
+                border: "none",
+                backgroundColor: "#ff0000",
+                color: "white",
+                fontWeight: "bold",
+                cursor: "pointer",
+              }}
+            >
               Выйти
             </button>
           )}
         </div>
-
+    {role === "admin" && (
+      <>
         {/* Станции */}
         <div style={cardStyle}>
           <h2>Станции</h2>
@@ -320,7 +402,12 @@ function App() {
                 <tr key={r.id}>
                   <td style={tdStyle}>{r.id}</td>
                   <td style={tdStyle}>{r.departure} → {r.arrival}</td>
-                  <td style={tdStyle}>{r.stops?.length ? r.stops.join(", ") : "—"}</td>
+                  <td style={tdStyle}>
+                    {r.stopsMode === "all" && "Везде"}
+                    {r.stopsMode === "none" && "Без остановок"}
+                    {r.stopsMode === "exclude" && `Кроме: ${r.stops?.join(", ") || "—"}`}
+                    {r.stopsMode === "include" && (r.stops?.join(", ") || "—")}
+                  </td>
                   <td style={tdStyle}>
                     <button style={buttonStyle} onClick={() => editRoute(r)}>✏️</button>
                     <button style={buttonStyle} onClick={() => deleteRoute(r.id)}>❌</button>
@@ -330,30 +417,149 @@ function App() {
             </tbody>
           </table>
         </div>
+        </>
+      )}
 
         {/* Рейсы */}
         <div style={cardStyle}>
           <h2>Рейсы</h2>
-          <TripForm routes={routes} trains={trains} trips={trips} onNewTrip={handleNewTrip} />
+          {/* Админ: форма добавления */}
+          {role === "admin" && (
+            <TripForm routes={routes} trains={trains} trips={trips} onNewTrip={handleNewTrip} />
+          )}
+          {/* Пользователь: поиск */}
+          {role !== "admin" && (
+            <div style={{ display: "flex", alignItems: "center", marginBottom: "10px" }}>
+              
+              <input
+                placeholder="Поиск по станции..."
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") setSearch(searchInput);
+                }}
+                style={{
+                  padding: "10px 12px",
+                  width: "260px",
+                  borderRadius: "12px",
+                  border: "1px solid #ccc",
+                  outline: "none",
+                  fontSize: "14px",
+                  marginRight: "10px"
+                }}
+              />
+
+              <button
+                onClick={() => setSearch(searchInput)}
+                style={{
+                  padding: "10px 14px",
+                  borderRadius: "12px",
+                  border: "none",
+                  backgroundColor: "#4ade80",
+                  color: "white",
+                  cursor: "pointer",
+                  fontWeight: "bold",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "6px"
+                }}
+              >
+                🔍 
+              </button>
+
+            </div>
+          )}
           <table style={tableStyle}>
-            <thead><tr><th style={thStyle}>Поезд</th><th style={thStyle}>Маршрут</th><th style={thStyle}>Время отправления</th><th style={thStyle}>Время прибытия</th><th style={thStyle}>Действия</th></tr></thead>
+            <thead>
+              <tr>
+                <th style={{ ...thStyle, width: "90px", textAlign: "center" }}>Поезд</th>
+                <th style={{ ...thStyle }}>Маршрут</th>
+                <th style={{ ...thStyle, width: "100px", textAlign: "center" }}>Отправление</th>
+                <th style={{ ...thStyle, width: "100px", textAlign: "center" }}></th>
+                <th style={{ ...thStyle, width: "100px", textAlign: "center" }}>Прибытие</th>
+
+                {role === "admin" && (
+                  <th style={{ ...thStyle, width: "90px", textAlign: "center" }}>Действия</th>
+                )}
+              </tr>
+              </thead>
             <tbody>
-              {trips.slice().sort((a,b) => a.departure_time.localeCompare(b.departure_time)).map(t => {
+              {trips
+                .filter(t => {
+                  const route = routes.find(r => r.id === t.route_id);
+                  if (!route) return false;
+
+                  const q = search.toLowerCase();
+
+                  return (
+                    route.departure.toLowerCase().includes(q) ||
+                    route.arrival.toLowerCase().includes(q) ||
+                    (route.stopsMode === "include"
+                      ? route.stops?.some(s => s.toLowerCase().includes(q))
+                      : route.stopsMode === "exclude"
+                        ? !route.stops?.some(s => s.toLowerCase().includes(q))
+                        : route.stopsMode === "all")
+                  );
+                  
+                })
+                .sort((a, b) => a.departure_time.localeCompare(b.departure_time))
+                .map(t => {
                 const route = routes.find(r => r.id === t.route_id);
                 const train = trains.find(tr => tr.id === t.train_id);
                 return (
                   <tr key={t.id}>
-                    <td style={tdStyle}>{train?.number || "—"}</td>
+
+                    <td style={{ ...tdStyle, textAlign: "center" }}>
+                      {train?.number || "—"}
+                    </td>
+
                     <td style={tdStyle}>
                       {route ? `${route.departure} → ${route.arrival}` : "—"}
-                      {route?.stops?.length > 0 && <div style={{ fontSize: "0.85rem", color: "#555" }}>Остановки: {route.stops.join(", ")}</div>}
+
+                      {route?.stopsMode === "all" && (
+                        <div style={{ fontSize: "0.85rem", color: "#555" }}>
+                          Везде
+                        </div>
+                      )}
+
+                      {route?.stopsMode === "none" && (
+                        <div style={{ fontSize: "0.85rem", color: "#555" }}>
+                          Без остановок
+                        </div>
+                      )}
+
+                      {route?.stopsMode === "exclude" && (
+                        <div style={{ fontSize: "0.85rem", color: "#555" }}>
+                          Кроме: {route.stops?.join(", ") || "—"}
+                        </div>
+                      )}
+
+                      {route?.stopsMode === "include" && (
+                        <div style={{ fontSize: "0.85rem", color: "#555" }}>
+                          Остановки: {route.stops?.join(", ") || "—"}
+                        </div>
+                      )}
                     </td>
-                    <td style={tdStyle}>{t.departure_time}</td>
-                    <td style={tdStyle}>{t.arrival_time}</td>
-                    <td style={tdStyle}>
-                      <button style={buttonStyle} onClick={() => editTrip(t)}>✏️</button>
-                      <button style={buttonStyle} onClick={() => deleteTrip(t.id)}>❌</button>
+
+                    <td style={{ ...tdStyle, textAlign: "center" }}>
+                      {t.departure_time}
                     </td>
+
+                    <td style={{ ...tdStyle, textAlign: "center", fontWeight: "500" }}>
+                      {getDuration(t.departure_time, t.arrival_time)}
+                    </td>
+
+                    <td style={{ ...tdStyle, textAlign: "center" }}>
+                      {t.arrival_time}
+                    </td>
+
+                    {role === "admin" && (
+                      <td style={{ ...tdStyle, textAlign: "center" }}>
+                        <button style={buttonStyle} onClick={() => editTrip(t)}>✏️</button>
+                        <button style={buttonStyle} onClick={() => deleteTrip(t.id)}>❌</button>
+                      </td>
+                    )}
+
                   </tr>
                 );
               })}
@@ -361,6 +567,7 @@ function App() {
           </table>
         </div>
       </div>
+      
 
       {/* Окно редактирования */}
       <EditModal

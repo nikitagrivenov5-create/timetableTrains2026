@@ -1,6 +1,12 @@
 [
   {
-    "email": "grivenov@icloud.com",
-    "password": "12345"
+    "username": "admin",
+    "password": "12345",
+    "role": "admin"
+  },
+  {
+    "username": "user",
+    "password": "54321",
+    "role": "user"
   }
 ]
